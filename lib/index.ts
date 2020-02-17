@@ -7,35 +7,33 @@ const statAsync = promisify(stat);
 const readAsync = promisify(read); // (fd, buffer, offset, length, position, callback)
 const openAsync = promisify(open);
 
-export type TDataSet = {
-  date: number; // all dates are correct but year is out by 40 years!
-  s1: number;
-  s2: number;
-  s3: number;
-  s4: number;
-  s5: number;
-  s6: number;
-};
-
 function fomatSensorTemp(buff: Buffer, offset: number): number {
   const val = buff.readInt16LE(offset);
   return NO_SENSOR_VALUE == val ? 0 : val / 10;
 }
 
-export async function fromPath(path: string) {
+function formatRelay(buff: Buffer, offset: number): boolean {
+  const val = buff.readInt16LE(offset);
+  return val == 200;
+}
+
+/**
+ * @param path Path to .DLF file
+ * @param offset Offset of entries from end of file. Default 0 i.e latest entry.
+ */
+export async function fromPath(path: string, offset = 0) {
   const { size } = await statAsync(path);
-  const latestOffset = size - ENTRY_LENGTH;
+  const latestOffset = size - ENTRY_LENGTH * (offset + 1);
   const entryBuffer = Buffer.alloc(ENTRY_LENGTH);
   const fd = await openAsync(path, "r");
   await readAsync(fd, entryBuffer, 0, ENTRY_LENGTH, latestOffset);
-  console.log(entryBuffer);
-  // read last 40 bytes
-  //fs.read(fd, buffer, offset, length, position, callback);
-
+  // console.log(entryBuffer);
   const date = entryBuffer.readUInt32LE(0);
   const sensors = [4, 6, 8, 10, 12, 14].map(offset =>
     fomatSensorTemp(entryBuffer, offset)
   );
+  // theres sould be information on more relays but i dont know the offets
+  const relay = [16].map(offset => formatRelay(entryBuffer, offset));
 
   return {
     date,
@@ -44,6 +42,10 @@ export async function fromPath(path: string) {
     s3: sensors[2],
     s4: sensors[3],
     s5: sensors[4],
-    s6: sensors[5]
-  } as TDataSet;
+    s6: sensors[5],
+    r1: relay[0],
+    he1: entryBuffer.readInt16LE(22),
+    status: entryBuffer.readInt16LE(26),
+    t1: entryBuffer.readInt16LE(32)
+  };
 }
