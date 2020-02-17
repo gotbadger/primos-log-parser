@@ -1,0 +1,20 @@
+{
+  "name": "primos-log-parser",
+  "version": "1.0.0",
+  "description": "Process binary logs from Primos solar controllers",
+  "main": "index.js",
+  "author": "Philip Hayton",
+  "license": "GPL-3.0",
+  "private": false,
+  "devDependencies": {
+    "@types/jest": "^25.1.2",
+    "@types/node": "^13.7.1",
+    "jest": "^25.1.0",
+    "ts-jest": "^25.2.0",
+    "typescript": "^3.7.5"
+  },
+  "scripts": {
+    "build": "tsc",
+    "test": "yarn jest"
+  }
+}
