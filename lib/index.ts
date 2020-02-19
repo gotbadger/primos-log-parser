@@ -1,5 +1,6 @@
 import { stat, read, open } from "fs";
 import { promisify } from "util";
+import { get } from "http";
 
 const ENTRY_LENGTH = 40;
 const NO_SENSOR_VALUE = 2500;
@@ -18,6 +19,33 @@ function formatRelay(buff: Buffer, offset: number): boolean {
 }
 
 /**
+ * @param url url of DLF file for use with wifi SD cards
+ * @param offset Offset of entries from end of file. Default 0 i.e latest entry.
+ */
+export async function fromUrl(url: string, offset = 0) {
+  return await new Promise(function(resolve, reject) {
+    get(url, resp => {
+      const chunks: Uint8Array[] = [];
+
+      resp.on("data", (chunk: Uint8Array) => {
+        chunks.push(chunk);
+      });
+
+      resp.on("end", () => {
+        const buffer = Buffer.concat(chunks);
+        const entryBuffer = Buffer.alloc(ENTRY_LENGTH);
+        const soruceStart = buffer.length - ENTRY_LENGTH * (offset + 1);
+        const sourceEnd = soruceStart + ENTRY_LENGTH;
+        buffer.copy(entryBuffer, 0, soruceStart, sourceEnd);
+        resolve(fromBuffer(entryBuffer));
+      });
+    }).on("error", err => {
+      throw new Error(`Request Failed: ${err.message}`);
+    });
+  });
+}
+
+/**
  * @param path Path to .DLF file
  * @param offset Offset of entries from end of file. Default 0 i.e latest entry.
  */
@@ -27,12 +55,18 @@ export async function fromPath(path: string, offset = 0) {
   const entryBuffer = Buffer.alloc(ENTRY_LENGTH);
   const fd = await openAsync(path, "r");
   await readAsync(fd, entryBuffer, 0, ENTRY_LENGTH, latestOffset);
-  // console.log(entryBuffer);
+  return fromBuffer(entryBuffer);
+}
+
+function fromBuffer(entryBuffer: Buffer) {
+  if (entryBuffer.length != ENTRY_LENGTH) {
+    throw "Binary data buffer invalid";
+  }
   const date = entryBuffer.readUInt32LE(0);
   const sensors = [4, 6, 8, 10, 12, 14].map(offset =>
     fomatSensorTemp(entryBuffer, offset)
   );
-  // theres sould be information on more relays but i dont know the offets
+  // theres should be information on more relays but i dont know the offsets
   const relay = [16].map(offset => formatRelay(entryBuffer, offset));
 
   return {
