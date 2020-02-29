@@ -8,6 +8,21 @@ const statAsync = promisify(stat);
 const readAsync = promisify(read); // (fd, buffer, offset, length, position, callback)
 const openAsync = promisify(open);
 
+export type ReadingType = {
+  date: number;
+  dateAjusted: number;
+  s1: number;
+  s2: number;
+  s3: number;
+  s4: number;
+  s5: number;
+  s6: number;
+  r1: boolean;
+  he1: number;
+  status: number;
+  t1: number;
+};
+
 function fomatSensorTemp(buff: Buffer, offset: number): number {
   const val = buff.readInt16LE(offset);
   return NO_SENSOR_VALUE == val ? 0 : val / 10;
@@ -22,8 +37,8 @@ function formatRelay(buff: Buffer, offset: number): boolean {
  * @param url url of DLF file for use with wifi SD cards
  * @param offset Offset of entries from end of file. Default 0 i.e latest entry.
  */
-export async function fromUrl(url: string, offset = 0) {
-  return await new Promise(function(resolve, reject) {
+export async function fromUrl(url: string, offset = 0): Promise<ReadingType> {
+  return await new Promise<ReadingType>(function(resolve, reject) {
     get(url, resp => {
       const chunks: Uint8Array[] = [];
 
@@ -49,7 +64,7 @@ export async function fromUrl(url: string, offset = 0) {
  * @param path Path to .DLF file
  * @param offset Offset of entries from end of file. Default 0 i.e latest entry.
  */
-export async function fromPath(path: string, offset = 0) {
+export async function fromPath(path: string, offset = 0): Promise<ReadingType> {
   const { size } = await statAsync(path);
   const latestOffset = size - ENTRY_LENGTH * (offset + 1);
   const entryBuffer = Buffer.alloc(ENTRY_LENGTH);
@@ -58,7 +73,7 @@ export async function fromPath(path: string, offset = 0) {
   return fromBuffer(entryBuffer);
 }
 
-function fromBuffer(entryBuffer: Buffer) {
+function fromBuffer(entryBuffer: Buffer): ReadingType {
   if (entryBuffer.length != ENTRY_LENGTH) {
     throw "Binary data buffer invalid";
   }
@@ -69,8 +84,13 @@ function fromBuffer(entryBuffer: Buffer) {
   // theres should be information on more relays but i dont know the offsets
   const relay = [16].map(offset => formatRelay(entryBuffer, offset));
 
+  // date is off by 50 years probably to save space on log entries
+  let dateAjusted = new Date(date);
+  dateAjusted.setFullYear(dateAjusted.getFullYear() + 50);
+
   return {
     date,
+    dateAjusted: dateAjusted.valueOf(),
     s1: sensors[0],
     s2: sensors[1],
     s3: sensors[2],

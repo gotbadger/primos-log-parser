@@ -1,6 +1,6 @@
 {
   "name": "primos-log-parser",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "description": "Process binary logs from Primos solar controllers",
   "repository": "gotbadger/primos-log-parser",
   "homepage": "https://github.com/gotbadger/primos-log-parser",
