@@ -11,7 +11,7 @@ const FIXTURE_URL = `${FIXTURE_URL_HOST}${FIXTURE_URL_PATH}`;
 
 const EXPECTED_BASE_RESULT = {
   date: 315943898,
-  dateAjusted: 1578156343898,
+  dateAjusted: 1578152743898,
   s1: 8.9,
   s2: 17.7,
   s3: 0,
@@ -33,7 +33,7 @@ test("relay off", () => {
 test("relay on", () => {
   return expect(fromPath(FIXTURE_RELAY)).resolves.toStrictEqual({
     date: 315923677,
-    dateAjusted: 1578156323677,
+    dateAjusted: 1578152723677,
     s1: 17.5,
     s2: 14.7,
     s3: 0,
@@ -50,7 +50,7 @@ test("relay on", () => {
 test("get data using offset", () => {
   return expect(fromPath(FIXTURE_RELAY, 79)).resolves.toStrictEqual({
     date: 315918937,
-    dateAjusted: 1578156318937,
+    dateAjusted: 1578152718937,
     s1: 20.5,
     s2: 11.8,
     s3: 0,

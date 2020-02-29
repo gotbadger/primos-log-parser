@@ -86,11 +86,11 @@ function fromBuffer(entryBuffer: Buffer): ReadingType {
 
   // date is off by 50 years probably to save space on log entries
   let dateAjusted = new Date(date);
-  dateAjusted.setFullYear(dateAjusted.getFullYear() + 50);
+  dateAjusted.setUTCFullYear(dateAjusted.getUTCFullYear() + 50);
 
   return {
     date,
-    dateAjusted: dateAjusted.valueOf(),
+    dateAjusted: dateAjusted.getTime(),
     s1: sensors[0],
     s2: sensors[1],
     s3: sensors[2],
