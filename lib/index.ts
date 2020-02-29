@@ -10,7 +10,7 @@ const openAsync = promisify(open);
 
 export type ReadingType = {
   date: number;
-  dateAjusted: number;
+  realDate: number;
   s1: number;
   s2: number;
   s3: number;
@@ -85,12 +85,12 @@ function fromBuffer(entryBuffer: Buffer): ReadingType {
   const relay = [16].map(offset => formatRelay(entryBuffer, offset));
 
   // date is off by 50 years probably to save space on log entries
-  let dateAjusted = new Date(date);
-  dateAjusted.setUTCFullYear(dateAjusted.getUTCFullYear() + 50);
+  let realDate = new Date(date);
+  realDate.setUTCFullYear(realDate.getUTCFullYear() + 50);
 
   return {
     date,
-    dateAjusted: dateAjusted.getTime(),
+    realDate: realDate.getTime(),
     s1: sensors[0],
     s2: sensors[1],
     s3: sensors[2],
