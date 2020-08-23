@@ -8,3 +8,5 @@ The device with WiFi SD card attached:
 ![contoller with SD card extender attached](https://user-images.githubusercontent.com/699436/75481558-2a239780-599b-11ea-98d0-9051e925c352.png)
 
 You should be able to read logs for any of the other primos devices.
+
+For further info you can see a simple example implmentation using a wifi sd card here: https://github.com/gotbadger/solar-monitor
