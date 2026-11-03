@@ -1,10 +1,13 @@
 {
   "compilerOptions": {
-    "target": "es5",
+    "target": "es2022",
     "module": "commonjs",
+    "lib": ["es2022"],
+    "types": ["node"],
     "esModuleInterop": true,
     "declaration": true,
     "outDir": "./dist",
     "strict": true
-  }
+  },
+  "include": ["lib/**/*.ts"]
 }
