@@ -4,6 +4,9 @@ The Primos is a solar thermal controller manufactured by [prozeda](https://proze
 
 This project is an attempt to reverse the binary format so data can be extracted programmatically.
 
+The device with WiFi SD card attached:
+![contoller with SD card extender attached](https://user-images.githubusercontent.com/699436/75481558-2a239780-599b-11ea-98d0-9051e925c352.png)
+
 ## Installation
 
 ```sh
