@@ -1,15 +1,19 @@
-import { fromPath, fromUrl } from "./index";
-import { basename, join } from "path";
-import nock from "nock";
+import { test } from "node:test";
+import assert from "node:assert/strict";
+import { join } from "node:path";
+import { createServer } from "node:http";
+import type { IncomingMessage, ServerResponse } from "node:http";
+import { readFile, writeFile, rm, mkdtemp } from "node:fs/promises";
+import { tmpdir } from "node:os";
+import { fromPath, fromUrl, type ReadingType } from "./index";
 
-const FIXTURES_BASE_PATH = join(basename(__dirname), "..", "fixtures");
+const ENTRY_LENGTH = 40;
+
+const FIXTURES_BASE_PATH = join(__dirname, "..", "fixtures");
 const FIXTURE_BASE = join(FIXTURES_BASE_PATH, "base.DLF");
 const FIXTURE_RELAY = join(FIXTURES_BASE_PATH, "relay.DLF");
-const FIXTURE_URL_HOST = "http://example.local";
-const FIXTURE_URL_PATH = "/base.DLF";
-const FIXTURE_URL = `${FIXTURE_URL_HOST}${FIXTURE_URL_PATH}`;
 
-const EXPECTED_BASE_RESULT = {
+const EXPECTED_BASE_RESULT: ReadingType = {
   date: 315943898,
   realDate: 1578152743898,
   s1: 8.9,
@@ -24,53 +28,156 @@ const EXPECTED_BASE_RESULT = {
   he1: 0
 };
 
-test("relay off", () => {
-  return expect(fromPath(FIXTURE_BASE)).resolves.toStrictEqual(
-    EXPECTED_BASE_RESULT
+const EXPECTED_RELAY_RESULT: ReadingType = {
+  date: 315923677,
+  realDate: 1578152723677,
+  s1: 17.5,
+  s2: 14.7,
+  s3: 0,
+  s4: 0,
+  s5: 0,
+  s6: 0,
+  r1: true,
+  status: 2,
+  t1: 4677,
+  he1: 4000
+};
+
+const EXPECTED_OFFSET_RESULT: ReadingType = {
+  date: 315918937,
+  realDate: 1578152718937,
+  s1: 20.5,
+  s2: 11.8,
+  s3: 0,
+  s4: 0,
+  s5: 0,
+  s6: 0,
+  r1: true,
+  status: 2,
+  t1: 4676,
+  he1: 5000
+};
+
+type Handler = (req: IncomingMessage, res: ServerResponse) => void;
+
+async function withServer(
+  handler: Handler,
+  fn: (url: string) => Promise<void>
+): Promise<void> {
+  const server = createServer(handler);
+  await new Promise<void>(resolve => server.listen(0, "127.0.0.1", resolve));
+  const address = server.address();
+  if (typeof address === "string" || address === null) {
+    throw new Error("could not determine test server port");
+  }
+  try {
+    await fn(`http://127.0.0.1:${address.port}/base.DLF`);
+  } finally {
+    await new Promise<void>(resolve => server.close(() => resolve()));
+  }
+}
+
+test("relay off", async () => {
+  assert.deepStrictEqual(await fromPath(FIXTURE_BASE), EXPECTED_BASE_RESULT);
+});
+
+test("relay on", async () => {
+  assert.deepStrictEqual(await fromPath(FIXTURE_RELAY), EXPECTED_RELAY_RESULT);
+});
+
+test("get data using offset", async () => {
+  assert.deepStrictEqual(
+    await fromPath(FIXTURE_RELAY, 79),
+    EXPECTED_OFFSET_RESULT
   );
 });
 
-test("relay on", () => {
-  return expect(fromPath(FIXTURE_RELAY)).resolves.toStrictEqual({
-    date: 315923677,
-    realDate: 1578152723677,
-    s1: 17.5,
-    s2: 14.7,
-    s3: 0,
-    s4: 0,
-    s5: 0,
-    s6: 0,
-    r1: true,
-    status: 2,
-    t1: 4677,
-    he1: 4000
+test("fromUrl", async () => {
+  const body = await readFile(FIXTURE_BASE);
+  await withServer((req, res) => {
+    res.writeHead(200, { "Content-Type": "binary" });
+    res.end(body);
+  }, async url => {
+    assert.deepStrictEqual(await fromUrl(url), EXPECTED_BASE_RESULT);
   });
 });
 
-test("get data using offset", () => {
-  return expect(fromPath(FIXTURE_RELAY, 79)).resolves.toStrictEqual({
-    date: 315918937,
-    realDate: 1578152718937,
-    s1: 20.5,
-    s2: 11.8,
-    s3: 0,
-    s4: 0,
-    s5: 0,
-    s6: 0,
-    r1: true,
-    status: 2,
-    t1: 4676,
-    he1: 5000
+test("fromUrl with offset", async () => {
+  const body = await readFile(FIXTURE_RELAY);
+  await withServer((req, res) => {
+    res.writeHead(200, { "Content-Type": "binary" });
+    res.end(body);
+  }, async url => {
+    assert.deepStrictEqual(await fromUrl(url, 79), EXPECTED_OFFSET_RESULT);
   });
 });
 
-test("fromUrl", () => {
-  nock(FIXTURE_URL_HOST)
-    .get(FIXTURE_URL_PATH)
-    .replyWithFile(200, FIXTURE_BASE, {
-      "Content-Type": "binary"
-    });
-  return expect(fromUrl(FIXTURE_URL)).resolves.toStrictEqual(
-    EXPECTED_BASE_RESULT
+test("fromUrl rejects non-2xx status", async () => {
+  await withServer((req, res) => {
+    res.writeHead(404, { "Content-Type": "text/html" });
+    res.end("<html>" + "x".repeat(400) + "</html>");
+  }, async url => {
+    await assert.rejects(fromUrl(url), /Request Failed: 404/);
+  });
+});
+
+test("fromUrl rejects connection errors", async () => {
+  // nothing is listening on this port
+  await assert.rejects(fromUrl("http://127.0.0.1:1/base.DLF"));
+});
+
+test("invalid offset rejects", async () => {
+  await assert.rejects(fromPath(FIXTURE_BASE, -1), /non-negative integer/);
+  await assert.rejects(fromPath(FIXTURE_BASE, 1.5), /non-negative integer/);
+  await assert.rejects(fromPath(FIXTURE_BASE, NaN), /non-negative integer/);
+  await assert.rejects(
+    fromPath(FIXTURE_BASE, "0" as unknown as number),
+    /non-negative integer/
   );
+  await assert.rejects(
+    fromUrl("http://127.0.0.1:1/base.DLF", -1),
+    /non-negative integer/
+  );
+});
+
+test("offset beyond start of data rejects", async () => {
+  const body = await readFile(FIXTURE_BASE);
+  // 219599 bytes is ~5489 full entries; one more is out of range
+  const entries = Math.floor(body.length / ENTRY_LENGTH);
+  await assert.rejects(fromPath(FIXTURE_BASE, entries + 1), /beyond the start/);
+  await withServer((req, res) => {
+    res.writeHead(200);
+    res.end(body);
+  }, async url => {
+    await assert.rejects(
+      fromUrl(url, entries + 1),
+      /beyond the start of the response/
+    );
+  });
+});
+
+test("short file rejects", async () => {
+  const dir = await mkdtemp(join(tmpdir(), "primos-test-"));
+  try {
+    const shortPath = join(dir, "short.DLF");
+    await writeFile(shortPath, Buffer.alloc(20));
+    await assert.rejects(fromPath(shortPath), /beyond the start of file/);
+  } finally {
+    await rm(dir, { recursive: true, force: true });
+  }
+});
+
+test("missing file rejects", async () => {
+  await assert.rejects(
+    fromPath(join(FIXTURES_BASE_PATH, "does-not-exist.DLF")),
+    /ENOENT/
+  );
+});
+
+test("repeated reads do not leak file descriptors", async () => {
+  // far more reads than typical available descriptors; a leaked fd
+  // per read would fail with EMFILE/ENFILE before this loop completes
+  for (let i = 0; i < 500; i++) {
+    await fromPath(FIXTURE_BASE);
+  }
 });
